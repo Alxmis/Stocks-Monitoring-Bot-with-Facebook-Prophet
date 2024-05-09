@@ -11,7 +11,7 @@ def main() -> None:
 
     start_handler = CommandHandler('start', handlers.start)
     help_handler = CommandHandler('help', handlers.help)
-    check_spikes = CommandHandler('check_spikes', handlers.check_spikes)
+    check_spikes = CommandHandler('spikes', handlers.check_spikes)
     unknown_handler = MessageHandler(filters.COMMAND, handlers.unknown)
 
     application.add_handler(start_handler)
