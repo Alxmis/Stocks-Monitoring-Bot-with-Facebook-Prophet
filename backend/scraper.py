@@ -13,14 +13,14 @@ class Scraper():
     def __init__(self, symbols_list) -> None:
         self.symbols_list = symbols_list
 
-    def fetch_data(self, symbol=None, mode='adj_close') -> pd.DataFrame:
+    def fetch_data(self, symbol=None, mode='adj_close', days=120) -> pd.DataFrame:
         # Get adj_close data for all stocks
         if mode == 'adj_close':
             try:
                 data = pd.DataFrame(columns=self.symbols_list)
                 for ticker in self.symbols_list:
                     end_date = datetime.today()
-                    start_date = end_date - timedelta(days=2)
+                    start_date = end_date - timedelta(days=days) # When calling func days=2
                     data[ticker] = yf.download(ticker,
                                                start=start_date,
                                                end=end_date)['Adj Close']
@@ -32,9 +32,14 @@ class Scraper():
 
         # Get full data for one stock
         elif mode == 'stock_data':
+            if symbol == None:
+                error_handler.raise_error(
+                    msg=f"Forget to mention symbol."
+                )
+
             try:
                 end_date = datetime.today()
-                start_date = end_date - timedelta(days=120) # TODO: days
+                start_date = end_date - timedelta(days=days) # TODO: days
                 ticker_data = yf.download(symbol, start=start_date, end=end_date) # TODO: period
                 return ticker_data
             except Exception as e:

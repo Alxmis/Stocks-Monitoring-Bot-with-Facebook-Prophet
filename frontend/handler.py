@@ -17,6 +17,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from backend.scraper import Scraper
 from backend.tech_analyzer import Analyzer
 from backend.user_database import DB
+from backend.predictor import Predictor
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                      level=logging.INFO)
@@ -31,7 +32,6 @@ notification_log = 'backend/notification_log.txt'
 
 # initializing ----------------------------------------------------------------
 scraper = Scraper(SYMBOLS_LIST)
-data = scraper.fetch_data(mode='adj_close')
 
 db = DB()
 db.init_db()
@@ -75,17 +75,26 @@ def update_notification_log(notification_log):
         file.write(str(datetime.now().date()))
 
 async def check_spikes(update: Update, context: ContextTypes.DEFAULT_TYPE, mode='manually') -> None:
+    data = scraper.fetch_data(mode='adj_close', days=2)
     skyrockets_data = scraper.check_spike(data=data)
     if skyrockets_data is not False:
         for symbol in skyrockets_data.columns[1:]:
-            stock_data = scraper.fetch_data(symbol=str(symbol), mode='stock_data')
+            stock_data = scraper.fetch_data(symbol=str(symbol), mode='stock_data', days=30)
 
             analyzer = Analyzer(symbol=str(symbol), stock_data=stock_data)
             adv_stock_data = analyzer.analyze()
             description = analyzer.get_description(start_date=datetime.now().date() - timedelta(days=1) - timedelta(days=1), # TODO: remove timedelta(days=1). this for testing at night when no data for new day
                                                    end_date=datetime.now().date() - timedelta(days=1),
-                                                   adv_stock_data=adv_stock_data)
+                                                   adv_stock_data=adv_stock_data
+            )
             plot_images = analyzer.make_tech_plots(adv_stock_data=adv_stock_data)
+
+            all_time_stock_data = scraper.fetch_data(symbol=str(symbol), mode='adj_close', days=)
+            stock_price = stock_data[['Adj Close']]
+            predictor = Predictor(stock_price)
+            predictor.train_model()
+            stock_price_forecast = predictor.make_forecast(periods=7) # TODO: periods
+            predictor.make_forecast_plot(stock_price_forecast)
 
             if mode == 'manually':
                 await context.bot.send_message(chat_id=update.message.chat_id,
@@ -96,8 +105,6 @@ async def check_spikes(update: Update, context: ContextTypes.DEFAULT_TYPE, mode=
                 )
 
             elif mode == 'auto':
-                # if is_notification_sent_today(notification_log):
-                #     return
                 users = db.get_users()
                 for user in users:
                     await context.bot.send_message(chat_id=user,

@@ -2,10 +2,10 @@ import sqlite3
 
 
 class DB:
-    def __init__(self):
+    def __init__(self) -> None:
         self.db_file = 'backend/users.db'
 
-    def init_db(self):
+    def init_db(self) -> None:
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
         cursor.execute('''
@@ -17,14 +17,14 @@ class DB:
         conn.commit()
         conn.close()
 
-    def add_user(self, chat_id):
+    def add_user(self, chat_id) -> None:
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
         cursor.execute('INSERT OR IGNORE INTO USERS (chat_id) VALUES (?)', (chat_id,))
         conn.commit()
         conn.close()
 
-    def get_users(self):
+    def get_users(self) -> list:
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
         cursor.execute('SELECT chat_id FROM users')
