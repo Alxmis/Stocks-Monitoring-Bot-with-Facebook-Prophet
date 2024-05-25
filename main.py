@@ -1,25 +1,48 @@
-# import front
-from telegram.ext import (
-    filters, MessageHandler, ApplicationBuilder, CommandHandler
-)
-from backend import handlers
+from dotenv import load_dotenv
+import os
+import datetime
+import pytz
 
-TOKEN = '6901207494:AAGNaj8JepdE8BxpgJl1XgkctfCeMZ_WRhM'
+from telegram.ext import (
+    filters, MessageHandler, ApplicationBuilder, CommandHandler, ConversationHandler
+)
+from frontend import handler
+from frontend.handler import CHOOSING
+
+
+# Loading env variables ----------------------------------------------------------------
+load_dotenv()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+# --------------------------------------------------------------------------------------
+
 
 def main() -> None:
-    application = ApplicationBuilder().token(TOKEN).build()
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    start_handler = CommandHandler('start', handlers.start)
-    help_handler = CommandHandler('help', handlers.help)
-    check_spikes = CommandHandler('spikes', handlers.check_spikes)
-    unknown_handler = MessageHandler(filters.COMMAND, handlers.unknown)
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", handler.start)],
+        states={
+            CHOOSING: [
+                MessageHandler(
+                    filters.Regex(r"^Check spikes$"), handler.check_spikes
+                ),
+                MessageHandler(filters.Regex(r"^Help$"), handler.help),
+            ],
+        },
+        fallbacks=[
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handler.fallback)
+        ]
+    )
 
-    application.add_handler(start_handler)
-    application.add_handler(help_handler)
-    application.add_handler(check_spikes)
-    application.add_handler(unknown_handler)
+    application.add_handler(conv_handler)
+
+    job_queue = application.job_queue
+    job_queue.run_daily(lambda context: handler.check_spikes(None, context=context, mode='auto'),
+                        time=datetime.time(hour=3, minute=32, second=44).replace(tzinfo=pytz.timezone('Europe/Moscow')) # TODO: change time
+    )
 
     application.run_polling()
 
-if __name__ == '__main':
+
+if __name__ == '__main__':
     main()

@@ -8,11 +8,12 @@ from typing import Union
 
 THRESHOLD = 0.004 # TODO
 
+
 class Scraper():
     def __init__(self, symbols_list) -> None:
         self.symbols_list = symbols_list
 
-    def fetch_data(self, mode='adj_close') -> pd.DataFrame:
+    def fetch_data(self, symbol=None, mode='adj_close') -> pd.DataFrame:
         # Get adj_close data for all stocks
         if mode == 'adj_close':
             try:
@@ -32,7 +33,6 @@ class Scraper():
         # Get full data for one stock
         elif mode == 'stock_data':
             try:
-                symbol = self.symbols_list[0]
                 end_date = datetime.today()
                 start_date = end_date - timedelta(days=120) # TODO: days
                 ticker_data = yf.download(symbol, start=start_date, end=end_date) # TODO: period
@@ -44,14 +44,14 @@ class Scraper():
 
     def check_spike(self, data: pd.DataFrame) -> Union[bytes, bool]:
         spikes_data = data.pct_change().dropna()
-        print(spikes_data)
         skyrockets_data = spikes_data[abs(spikes_data) > THRESHOLD].dropna(how='all', axis=1)
         return skyrockets_data if not skyrockets_data.empty else False
+
 
     # def make_plot(self, raw_data: pd.DataFrame, symbol: str) -> bytes:
     #     stock_data = raw_data[symbol]
     #
-    #     plt.style.use('dark_background') # TODO
+    #     plt.style.use('dark_background')
     #     stock_data.plot(figsize=(10, 7), color='orange')
     #     plt.title(f"Adjusted Close Price of {symbol}", fontsize=16)
     #     plt.ylabel('Price', fontsize=14)
@@ -65,3 +65,9 @@ class Scraper():
     #     plt.close()
     #
     #     return buf.getvalue()
+
+
+# scraper = Scraper()
+# data = scraper.fetch_data(mode='adj_close')
+# skyrockets_data = scraper.check_spike(data=data)
+# print(skyrockets_data)
