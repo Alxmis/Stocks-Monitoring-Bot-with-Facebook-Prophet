@@ -23,8 +23,8 @@ class Predictor():
 
         self.model.fit(self.stock_price)
 
-    def make_forecast(self, periods=365) -> pd.DataFrame: # TODO: periods
-        future = self.model.make_future_dataframe(periods=periods, freq='d')
+    def make_forecast(self, periods=7) -> pd.DataFrame: # TODO: periods
+        future = self.model.make_future_dataframe(periods=periods, freq='5T')
         future_boolean = future['ds'].map(lambda x: True if x.weekday() in range(0, 5) else False)
         future = future[future_boolean]
 

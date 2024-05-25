@@ -24,6 +24,8 @@ class Scraper():
                     data[ticker] = yf.download(ticker,
                                                start=start_date,
                                                end=end_date)['Adj Close']
+                    # print(data)
+                    # input()
                 return data
             except Exception as e:
                 error_handler.raise_error(
