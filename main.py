@@ -43,7 +43,7 @@ def main() -> None:
 
     job_queue = application.job_queue
     job_queue.run_daily(lambda context: handler.check_spikes(None, context=context, mode='auto'),
-                        time=datetime.time(hour=3, minute=32, second=44).replace(tzinfo=LOCAL_TIMEZONE) # TODO: change time
+                        time=datetime.time(hour=0, minute=0).replace(tzinfo=LOCAL_TIMEZONE)
     )
 
     application.run_polling()

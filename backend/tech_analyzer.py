@@ -48,12 +48,24 @@ class Analyzer():
         return adv_stock_data
 
     def get_description(self, start_date: datetime.date, end_date: datetime.date, adv_stock_data: pd.DataFrame) -> str:
+        adv_stock_data = adv_stock_data.loc[adv_stock_data.index.to_series().dt.date.isin([
+                # pd.to_datetime(datetime.now().date() - timedelta(days=1)),
+                start_date,
+                # pd.to_datetime(datetime.now().date())
+                end_date,
+            ])].groupby(adv_stock_data.index.to_series().dt.date).tail(1)
+        print(adv_stock_data)
+        print(adv_stock_data['Adj Close'])
+
         start_date = start_date.strftime('%Y-%m-%d')
         end_date = end_date.strftime('%Y-%m-%d')
 
         start_price = adv_stock_data.loc[start_date, 'Adj Close']
         end_price = adv_stock_data.loc[end_date, 'Adj Close']
+        print(start_price, end_price)
+        input()
         price_change = (end_price - start_price) / start_price
+        print(price_change)
 
         start_volume = adv_stock_data.loc[start_date, 'Volume']
         end_volume = adv_stock_data.loc[end_date, 'Volume']

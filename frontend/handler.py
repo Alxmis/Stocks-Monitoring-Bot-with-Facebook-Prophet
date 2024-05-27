@@ -50,7 +50,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     db.add_user(chat_id)
 
     await context.bot.send_message(chat_id=chat_id,
-                                   text=f"Hi! I'm bot to help you monitor stocks. You have been registered for daily notifications!.",
+                                   text=f"Hi! I'm bot to help you monitor stocks. You have been registered for daily notifications!\nYou'll be notified when new spikes get caught.",
                                    reply_markup=markup,
     )
     return CHOOSING
@@ -74,35 +74,54 @@ def update_notification_log(notification_log):
     with open(notification_log, 'a') as file:
         file.write(str(datetime.now().date()))
 
-async def check_spikes(update: Update, context: ContextTypes.DEFAULT_TYPE, mode='manually') -> None:
-    data = scraper.fetch_data(mode='adj_close', days=2)
+async def check_spikes(update: Update, context: ContextTypes.DEFAULT_TYPE, mode='manual') -> None:
+    data = scraper.fetch_data(mode='adj_close', days=4, interval='1d') # TODO: change days to 2
+    # print(data)
+    # print(datetime.now().date() - timedelta(days=3) - timedelta(days=1))
     skyrockets_data = scraper.check_spike(data=data)
+    # print(skyrockets_data)
+    # print(skyrockets_data.dropna(axis=1))
+    # print(skyrockets_data.dropna(axis=1).sort_index(axis=1))
+    # input()
 
     if skyrockets_data is not False:
+        skyrockets_data = skyrockets_data.dropna(axis=1).sort_index(axis=1)
+
         for symbol in skyrockets_data.columns[1:]:
-            stock_data = scraper.fetch_data(symbol=str(symbol), mode='stock_data', days=120)
+            stock_data = scraper.fetch_data(symbol=str(symbol), mode='stock_data', days=30, interval='1h')
 
             analyzer = Analyzer(symbol=str(symbol), stock_data=stock_data)
             adv_stock_data = analyzer.analyze()
-            description = analyzer.get_description(start_date=datetime.now().date() - timedelta(days=1) - timedelta(days=1), # TODO: remove timedelta(days=1). this for testing at night when no data for new day
-                                                   end_date=datetime.now().date() - timedelta(days=1),
+
+            # recent_stock_price = adv_stock_data.loc[adv_stock_data.index.to_series().dt.date.isin([
+            #     # pd.to_datetime(datetime.now().date() - timedelta(days=1)),
+            #     pd.to_datetime('2024-05-23').date(),
+            #     # pd.to_datetime(datetime.now().date())
+            #     pd.to_datetime('2024-05-24').date(),
+            # ])].groupby(adv_stock_data.index.to_series().dt.date).tail(1)
+            # print(recent_stock_price)
+            description = analyzer.get_description(start_date=datetime.now().date() - timedelta(days=3) - timedelta(days=1), # TODO: remove timedelta(days=1). this for testing at night when no data for new day
+                                                   end_date=datetime.now().date() - timedelta(days=3),
                                                    adv_stock_data=adv_stock_data
             )
             plot_images = analyzer.make_tech_plots(adv_stock_data=adv_stock_data)
 
-            # all_time_stock_data = scraper.fetch_data(symbol=str(symbol), mode='adj_close', days=)
-            # stock_price = stock_data[['Adj Close']]
+            # Predictions
+            # stock_price = scraper.fetch_data(symbol=str(symbol), mode='adj_close', days=360, interval='1h')
             # predictor = Predictor(stock_price)
             # predictor.train_model()
             # stock_price_forecast = predictor.make_forecast(periods=7) # TODO: periods
             # predictor.make_forecast_plot(stock_price_forecast)
 
-            if mode == 'manually':
-                await context.bot.send_message(chat_id=update.message.chat_id,
-                                               text=description,
-                )
+            if mode == 'manual':
+                # await context.bot.send_message(chat_id=update.message.chat_id,
+                #                                text=description,
+                # )
                 await context.bot.send_photo(chat_id=update.message.chat_id,
                                              photo=InputFile(plot_images['PT']),
+                )
+                await context.bot.send_message(chat_id=update.message.chat_id,
+                                               photo=InputFile(plot_images['forecast_plot'])
                 )
 
             elif mode == 'auto':
@@ -115,6 +134,11 @@ async def check_spikes(update: Update, context: ContextTypes.DEFAULT_TYPE, mode=
                                                  photo=InputFile(plot_images['PT']),
                     )
                 update_notification_log(notification_log)
+
+    else:
+        await update.message.reply_text(text=f"No spikes caught today.",
+                                        reply_markup=markup,
+        ) # Sent only if spikes are manually checked
 
     return CHOOSING
 
