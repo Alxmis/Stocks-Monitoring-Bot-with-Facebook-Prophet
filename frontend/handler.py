@@ -107,21 +107,21 @@ async def check_spikes(update: Update, context: ContextTypes.DEFAULT_TYPE, mode=
             plot_images = analyzer.make_tech_plots(adv_stock_data=adv_stock_data)
 
             # Predictions
-            # stock_price = scraper.fetch_data(symbol=str(symbol), mode='adj_close', days=360, interval='1h')
-            # predictor = Predictor(stock_price)
-            # predictor.train_model()
-            # stock_price_forecast = predictor.make_forecast(periods=7) # TODO: periods
-            # predictor.make_forecast_plot(stock_price_forecast)
+            stock_price = scraper.fetch_data(symbol=str(symbol), mode='stock_data', days=360, interval='1h')
+            predictor = Predictor(stock_price=stock_price)
+            predictor.train_model()
+            stock_price_forecast = predictor.make_forecast(periods=7) # TODO: periods
+            forecast_plot_images = predictor.make_forecast_plot(stock_price_forecast=stock_price_forecast)
 
             if mode == 'manual':
-                # await context.bot.send_message(chat_id=update.message.chat_id,
-                #                                text=description,
-                # )
-                await context.bot.send_photo(chat_id=update.message.chat_id,
-                                             photo=InputFile(plot_images['PT']),
-                )
                 await context.bot.send_message(chat_id=update.message.chat_id,
-                                               photo=InputFile(plot_images['forecast_plot'])
+                                               text=description,
+                )
+                await context.bot.send_photo(chat_id=update.message.chat_id,
+                                             photo=InputFile(plot_images['RSI']),
+                )
+                await context.bot.send_photo(chat_id=update.message.chat_id,
+                                               photo=InputFile(forecast_plot_images['forecast_plot'])
                 )
 
             elif mode == 'auto':

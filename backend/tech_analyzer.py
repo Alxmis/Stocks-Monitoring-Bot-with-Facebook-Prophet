@@ -31,7 +31,6 @@ class Analyzer():
         adv_stock_data.ta.psar(append=True)
 
         adv_stock_data['OBV_in_million'] = adv_stock_data['OBV']/1e7
-        adv_stock_data['MACD_histogram_12_26_9'] = adv_stock_data['MACDh_12_26_9'] # TODO: remove?
 
         adv_stock_data.iloc[:, 1:] = adv_stock_data.iloc[:, 1:].round(2)
 
@@ -54,18 +53,14 @@ class Analyzer():
                 # pd.to_datetime(datetime.now().date())
                 end_date,
             ])].groupby(adv_stock_data.index.to_series().dt.date).tail(1)
-        print(adv_stock_data)
-        print(adv_stock_data['Adj Close'])
+        adv_stock_data.index = adv_stock_data.index.date
 
-        start_date = start_date.strftime('%Y-%m-%d')
-        end_date = end_date.strftime('%Y-%m-%d')
+        # start_date = start_date.strftime('%Y-%m-%d')
+        # end_date = end_date.strftime('%Y-%m-%d')
 
         start_price = adv_stock_data.loc[start_date, 'Adj Close']
         end_price = adv_stock_data.loc[end_date, 'Adj Close']
-        print(start_price, end_price)
-        input()
         price_change = (end_price - start_price) / start_price
-        print(price_change)
 
         start_volume = adv_stock_data.loc[start_date, 'Volume']
         end_volume = adv_stock_data.loc[end_date, 'Volume']
@@ -111,6 +106,8 @@ class Analyzer():
     def make_tech_plots(self, adv_stock_data: pd.DataFrame) -> dict:
         plot_images = {}
 
+        columns = adv_stock_data.columns
+
         # Price Trend Chart
         plt.figure()
         plt.plot(adv_stock_data.index, adv_stock_data['Adj Close'], label='Adj Close', color='blue')
@@ -123,83 +120,90 @@ class Analyzer():
         plot_images['PT'] = self.save_plot_to_bytes()
 
         # On-Balance Volume Chart
-        plt.figure()
-        plt.plot(adv_stock_data['OBV'], label='On-Balance Volume')
-        plt.title(f"On-Balance Volume (OBV) Indicator of {self.symbol}")
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
-        plt.xticks(rotation=45, fontsize=8)
-        plt.legend()
-        plot_images['OBV'] = self.save_plot_to_bytes()
+        if 'OBV' in columns:
+            plt.figure()
+            plt.plot(adv_stock_data['OBV'], label='On-Balance Volume')
+            plt.title(f"On-Balance Volume (OBV) Indicator of {self.symbol}")
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
+            plt.xticks(rotation=45, fontsize=8)
+            plt.legend()
+            plot_images['OBV'] = self.save_plot_to_bytes()
 
         # MACD Plot
-        plt.figure()
-        plt.plot(adv_stock_data['MACD_12_26_9'], label='MACD')
-        plt.plot(adv_stock_data['MACDh_12_26_9'], label='MACD Histogram')
-        plt.title(f"MACD Indicator of {self.symbol}")
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
-        plt.xticks(rotation=45, fontsize=8)
-        plt.title("MACD")
-        plt.legend()
-        plot_images['MACD'] = self.save_plot_to_bytes()
+        if {'MACD_12_26_9', 'MACD_histogram_12_26_9'}.issubset(columns):
+            plt.figure()
+            plt.plot(adv_stock_data['MACD_12_26_9'], label='MACD')
+            plt.plot(adv_stock_data['MACD_histogram_12_26_9'], label='MACD Histogram')
+            plt.title(f"MACD Indicator of {self.symbol}")
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
+            plt.xticks(rotation=45, fontsize=8)
+            plt.title("MACD")
+            plt.legend()
+            plot_images['MACD'] = self.save_plot_to_bytes()
 
         # RSI Plot
-        plt.figure()
-        plt.plot(adv_stock_data['RSI_14'], label='RSI')
-        plt.axhline(y=70, color='r', linestyle='--', label='Overbought (70)')
-        plt.axhline(y=30, color='g', linestyle='--', label='Oversold (30)')
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
-        plt.xticks(rotation=45, fontsize=8)
-        plt.title(f"RSI Indicator of {self.symbol}")
-        plot_images['RSI'] = self.save_plot_to_bytes()
+        if 'RSI_14' in columns:
+            plt.figure()
+            plt.plot(adv_stock_data['RSI_14'], label='RSI')
+            plt.axhline(y=70, color='r', linestyle='--', label='Overbought (70)')
+            plt.axhline(y=30, color='g', linestyle='--', label='Oversold (30)')
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
+            plt.xticks(rotation=45, fontsize=8)
+            plt.title(f"RSI Indicator of {self.symbol}")
+            plot_images['RSI'] = self.save_plot_to_bytes()
 
         # Bollinger Bands Plot
-        plt.figure()
-        plt.plot(adv_stock_data.index, adv_stock_data['BBU_5_2.0'], label='Upper BB')
-        plt.plot(adv_stock_data.index, adv_stock_data['BBM_5_2.0'], label='Middle BB')
-        plt.plot(adv_stock_data.index, adv_stock_data['BBL_5_2.0'], label='Lower BB')
-        plt.plot(adv_stock_data.index, adv_stock_data['Adj Close'], label='Adj Close', color='brown')
-        plt.title(f"Bollinger Bands of {self.symbol}")
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
-        plt.xticks(rotation=45, fontsize=8)
-        plt.legend()
-        plot_images['BB'] = self.save_plot_to_bytes()
+        if {'BBU_5_2.0', 'BBM_5_2.0', 'BBL_5_2.0'}.issubset(columns):
+            plt.figure()
+            plt.plot(adv_stock_data.index, adv_stock_data['BBU_5_2.0'], label='Upper BB')
+            plt.plot(adv_stock_data.index, adv_stock_data['BBM_5_2.0'], label='Middle BB')
+            plt.plot(adv_stock_data.index, adv_stock_data['BBL_5_2.0'], label='Lower BB')
+            plt.plot(adv_stock_data.index, adv_stock_data['Adj Close'], label='Adj Close', color='brown')
+            plt.title(f"Bollinger Bands of {self.symbol}")
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
+            plt.xticks(rotation=45, fontsize=8)
+            plt.legend()
+            plot_images['BB'] = self.save_plot_to_bytes()
 
         # Stochastic Oscillator Plot
-        plt.figure()
-        plt.plot(adv_stock_data.index, adv_stock_data['STOCHk_14_3_3'], label='Stoch %K')
-        plt.plot(adv_stock_data.index, adv_stock_data['STOCHd_14_3_3'], label='Stoch %D')
-        plt.title(f"Stochastic Oscillator of {self.symbol}")
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
-        plt.xticks(rotation=45, fontsize=8)
-        plt.legend()
-        plot_images['SO'] = self.save_plot_to_bytes()
+        if {'STOCHk_14_3_3', 'STOCHd_14_3_3'}.issubset(columns):
+            plt.figure()
+            plt.plot(adv_stock_data.index, adv_stock_data['STOCHk_14_3_3'], label='Stoch %K')
+            plt.plot(adv_stock_data.index, adv_stock_data['STOCHd_14_3_3'], label='Stoch %D')
+            plt.title(f"Stochastic Oscillator of {self.symbol}")
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
+            plt.xticks(rotation=45, fontsize=8)
+            plt.legend()
+            plot_images['SO'] = self.save_plot_to_bytes()
 
         # Williams %R Plot
-        plt.figure()
-        plt.plot(adv_stock_data.index, adv_stock_data['WILLR_14'])
-        plt.title(f"Williams %R of {self.symbol}")
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
-        plt.xticks(rotation=45, fontsize=8)
-        plot_images['Williams'] = self.save_plot_to_bytes()
+        if 'WILLR_14' in columns:
+            plt.figure()
+            plt.plot(adv_stock_data.index, adv_stock_data['WILLR_14'])
+            plt.title(f"Williams %R of {self.symbol}")
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
+            plt.xticks(rotation=45, fontsize=8)
+            plot_images['Williams'] = self.save_plot_to_bytes()
 
         # ADX Plot
-        plt.figure()
-        plt.plot(adv_stock_data.index, adv_stock_data['ADX_14'])
-        plt.title(f"Average Directional Index (ADX) of {self.symbol}")
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
-        plt.xticks(rotation=45, fontsize=8)
-        plot_images['ADX'] = self.save_plot_to_bytes()
+        if 'ADX_14' in columns:
+            plt.figure()
+            plt.plot(adv_stock_data.index, adv_stock_data['ADX_14'])
+            plt.title(f"Average Directional Index (ADX) of {self.symbol}")
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
+            plt.xticks(rotation=45, fontsize=8)
+            plot_images['ADX'] = self.save_plot_to_bytes()
 
         # CMF Plot
-        plt.figure()
-        plt.plot(adv_stock_data.index, adv_stock_data['CMF_20'])
-        plt.title(f"Chaikin Money Flow (CMF) of {self.symbol}")
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
-        plt.xticks(rotation=45, fontsize=8)
-        plot_images['CMF'] = self.save_plot_to_bytes()
+        if 'CMF_20':
+            plt.figure()
+            plt.plot(adv_stock_data.index, adv_stock_data['CMF_20'])
+            plt.title(f"Chaikin Money Flow (CMF) of {self.symbol}")
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
+            plt.xticks(rotation=45, fontsize=8)
+            plot_images['CMF'] = self.save_plot_to_bytes()
 
         plt.close()
-
         return plot_images
 
 

@@ -3,6 +3,7 @@ from prophet import Prophet
 import matplotlib.pyplot as plt
 import yfinance as yf
 import pandas as pd
+from datetime import datetime, timedelta
 from functools import reduce
 from io import BytesIO
 
@@ -16,21 +17,20 @@ class Predictor():
         self.model = None
 
     def train_model(self) -> None:
-        self.stock_price = self.stock_price.reset_index().rename(columns={'Date': 'ds', 'Adj Close': 'y'})
-
+        self.stock_price.index = self.stock_price.index.tz_localize(None)
+        self.stock_price = self.stock_price.reset_index().rename(columns={'Datetime': 'ds', 'Adj Close': 'y'})
         self.model = Prophet()
         self.model.add_country_holidays(country_name='US')
 
         self.model.fit(self.stock_price)
 
     def make_forecast(self, periods=7) -> pd.DataFrame: # TODO: periods
-        future = self.model.make_future_dataframe(periods=periods, freq='5T')
+        future = self.model.make_future_dataframe(periods=periods)
         future_boolean = future['ds'].map(lambda x: True if x.weekday() in range(0, 5) else False)
         future = future[future_boolean]
 
         stock_price_forecast = self.model.predict(future)
 
-        # stock_price_forecast = stock_price_forecast.iloc[-periods:]
         return stock_price_forecast
 
     @staticmethod
@@ -42,13 +42,24 @@ class Predictor():
 
     def make_forecast_plot(self, stock_price_forecast):
         plot_images = {}
+
         forecast_plot = self.model.plot(stock_price_forecast)
+        ax = forecast_plot.gca()
+
+        # Adjusting plot scale # TODO: do
+        # predicted_lines_len = len(stock_price_forecast) - len(self.stock_price)
+        # stock_price_forecast = stock_price_forecast.iloc[-predicted_lines_len:, :]
+        # start_x = stock_price_forecast.iloc[0, 0]
+        # end_x = stock_price_forecast.iloc[-1, 0]
+        # ax.set_xlim(pd.to_datetime([start_x, end_x]))
+        # ax.set_ylim([280, 290]) # TODO: adjust y scale
+
         plot_images['forecast_plot'] = self.save_plot_to_bytes()
         forecast_components_plot = self.model.plot_components(stock_price_forecast)
         plot_images['forecast_components_plot'] = self.save_plot_to_bytes()
 
-        plt.show()
-        # plt.close()
+        plt.close()
+        return plot_images
 
     # def test_plot(self, stock_price_forecast):
     #     df = pd.merge(self.stock_price, stock_price_forecast, on='ds', how='right')
@@ -137,6 +148,7 @@ class Predictor():
 
 
 # stock_data = yf.download('AAPL', start='2018-01-01', end='2023-01-01')
+# print(stock_data)
 # stock_price = stock_data[['Adj Close']]
 # predictor = Predictor(stock_price)
 # predictor.train_model()
