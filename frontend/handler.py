@@ -14,24 +14,25 @@ from telegram.ext import (
     CallbackContext,
 )
 from apscheduler.schedulers.background import BackgroundScheduler
-from backend.scraper import Scraper
+from backend.scraper import Dataset
 from backend.tech_analyzer import Analyzer
 from backend.user_database import DB
 from backend.predictor import Predictor
+
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                      level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
-SYMBOLS_LIST = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')[0]
+TICKER_LIST = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')[0]
 # symbols_list = symbols.iloc[:, 0].tolist()
-SYMBOLS_LIST = SYMBOLS_LIST.iloc[:10, 0].tolist()
+TICKER_LIST = TICKER_LIST.iloc[:10, 0].tolist()
 
 notification_log = 'backend/notification_log.txt'
 
 # initializing ----------------------------------------------------------------
-scraper = Scraper(SYMBOLS_LIST)
+# scraper = Scraper(SYMBOLS_LIST)
 
 db = DB()
 db.init_db()
@@ -74,8 +75,66 @@ def update_notification_log(notification_log):
     with open(notification_log, 'a') as file:
         file.write(str(datetime.now().date()))
 
+def predict(ticker) -> dict:
+    predictor = Predictor(ticker)
+    forecast = predictor.forecast()
+
+    actual_forecast = round(forecast.yhat[0], 2)
+
+    lower_bound = round(forecast.yhat_lower[0], 2)
+    upper_bound = round(forecast.yhat_upper[0], 2)
+    bound = round(((upper_bound - actual_forecast) + (actual_forecast - lower_bound) / 2), 2)
+
+    # summary = predictor.info["summary"]
+    # country = predictor.info["country"]
+    # sector = predictor.info["sector"]
+    # website = predictor.info["website"]
+    # min_date = predictor.info["min_date"]
+    # max_date = predictor.info["max_date"]
+
+    forecast_date = predictor.forecast_date.date()
+    # print(f"Ticker: {ticker.upper()}")
+    # print(f"Sector: {sector}")
+    # print(f"Country: {country}")
+    # print(f"Website: {website}")
+    # print(f"Summary: {summary}")
+    # print(f"Min Date: {min_date}")
+    # print(f"Max Date: {max_date}")
+    # print(f"Forecast Date: {forecast_date}")
+    # print(f"Forecast: {actual_forecast}")
+    # print(f"Bound: {bound}")
+
+    return {
+        'forecast_date': forecast_date,
+        'forecast': forecast,
+        'bound': bound
+    }
+
+
 async def check_spikes(update: Update, context: ContextTypes.DEFAULT_TYPE, mode='manual') -> None:
-    data = scraper.fetch_data(mode='adj_close', days=4, interval='1d') # TODO: change days to 2
+    # print(TICKER_LIST)
+    for ticker in TICKER_LIST:
+        # print(ticker)
+        dataset = Dataset(ticker=ticker)
+        spike_status = dataset.check_spike()
+        if spike_status: # if spike is detected
+            data = dataset.build_dataset()
+            analyzer = Analyzer(ticker=ticker)
+            analyzer.analyze(data)
+            description = analyzer.get_description()
+            plot_images = analyzer.make_tech_plots()
+            predictor = Predictor(dataset=data)
+            forecast = predictor.forecast()
+            print(forecast)
+            print(predictor.forecast_date.date())
+            print(dataset.info)
+            input()
+
+    return CHOOSING
+
+
+
+    data = scraper.fetch_data(mode='adj_close', days=2, interval='1d') # TODO: change days to 2
     # print(data)
     # print(datetime.now().date() - timedelta(days=3) - timedelta(days=1))
     skyrockets_data = scraper.check_spike(data=data)
@@ -107,7 +166,7 @@ async def check_spikes(update: Update, context: ContextTypes.DEFAULT_TYPE, mode=
             plot_images = analyzer.make_tech_plots(adv_stock_data=adv_stock_data)
 
             # Predictions
-            stock_price = scraper.fetch_data(symbol=str(symbol), mode='stock_data', days=360, interval='1h')
+            stock_price = scraper.fetch_data(symbol=str(symbol), mode='stock_data', days=360, interval='1h') # TODO: days
             predictor = Predictor(stock_price=stock_price)
             predictor.train_model()
             stock_price_forecast = predictor.make_forecast(periods=7) # TODO: periods
