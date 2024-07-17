@@ -6,7 +6,8 @@ from telegram import (
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
     Update,
-    InputFile
+    InputFile,
+    InputMediaPhoto
 )
 from telegram.ext import (
     ContextTypes,
@@ -75,60 +76,59 @@ def update_notification_log(notification_log):
     with open(notification_log, 'a') as file:
         file.write(str(datetime.now().date()))
 
-def predict(ticker) -> dict:
-    predictor = Predictor(ticker)
-    forecast = predictor.forecast()
-
-    actual_forecast = round(forecast.yhat[0], 2)
-
-    lower_bound = round(forecast.yhat_lower[0], 2)
-    upper_bound = round(forecast.yhat_upper[0], 2)
-    bound = round(((upper_bound - actual_forecast) + (actual_forecast - lower_bound) / 2), 2)
-
-    # summary = predictor.info["summary"]
-    # country = predictor.info["country"]
-    # sector = predictor.info["sector"]
-    # website = predictor.info["website"]
-    # min_date = predictor.info["min_date"]
-    # max_date = predictor.info["max_date"]
-
-    forecast_date = predictor.forecast_date.date()
-    # print(f"Ticker: {ticker.upper()}")
-    # print(f"Sector: {sector}")
-    # print(f"Country: {country}")
-    # print(f"Website: {website}")
-    # print(f"Summary: {summary}")
-    # print(f"Min Date: {min_date}")
-    # print(f"Max Date: {max_date}")
-    # print(f"Forecast Date: {forecast_date}")
-    # print(f"Forecast: {actual_forecast}")
-    # print(f"Bound: {bound}")
-
-    return {
-        'forecast_date': forecast_date,
-        'forecast': forecast,
-        'bound': bound
-    }
-
-
 async def check_spikes(update: Update, context: ContextTypes.DEFAULT_TYPE, mode='manual') -> None:
     # print(TICKER_LIST)
     for ticker in TICKER_LIST:
         # print(ticker)
         dataset = Dataset(ticker=ticker)
         spike_status = dataset.check_spike()
-        if spike_status: # if spike is detected
+        if spike_status:
             data = dataset.build_dataset()
-            analyzer = Analyzer(ticker=ticker)
-            analyzer.analyze(data)
+
+            analyzer = Analyzer(ticker=ticker, data=data)
+            analyzer.analyze()
+
             description = analyzer.get_description()
             plot_images = analyzer.make_tech_plots()
+
             predictor = Predictor(dataset=data)
             forecast = predictor.forecast()
-            print(forecast)
-            print(predictor.forecast_date.date())
+            forecast_description = (f'\nForecast date: {forecast["forecast_date"]}\n'
+                                   f'Forecast (Closing Price): {forecast["forecast"]}\n'
+                                   f'Uncertainty: {forecast["bound"]}\n'
+            )
+            description += forecast_description
+
+            description += (f"\nAbout the company:\n"
+                            f"Sector: {dataset.info['sector']}\n"
+                            f"Country: {dataset.info['country']}\n"
+                            f"Website: {dataset.info['website']}\n"
+                            )
             print(dataset.info)
-            input()
+            print(forecast_description)
+
+        # if mode == 'manual':
+        #     await context.bot.send_message(chat_id=update.message.chat_id,
+        #                                    text=description
+        #     )
+        #     await context.bot.send_photo(chat_id=update.message.chat_id,
+        #                                  photo=InputFile(plot_images['PT'])
+        #     )
+        # elif mode == 'auto':
+        users = db.get_users()
+        for user in users:
+            await context.bot.send_message(chat_id=user,
+                                           text=description
+            )
+            await context.bot.send_photo(chat_id=user,
+                                         photo=InputFile(plot_images['PT'])
+            )
+        update_notification_log(notification_log)
+
+    # else:
+    #     await update.message.reply_text(text=f"No spikes caught today.",
+    #                                     reply_markup=markup,
+    #     )  # Sent only if spikes are manually checked
 
     return CHOOSING
 

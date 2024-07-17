@@ -10,15 +10,17 @@ from backend.predictor import Predictor
 from backend.scraper import Dataset
 
 class Analyzer:
-    def __init__(self, ticker: str) -> None:
+    def __init__(self, ticker: str, data: pd.DataFrame) -> None:
         self.ticker = ticker
-    #     self.stock_data = stock_data
+        self.data = data
+        # self.stock_data = stock_data
 
 
     # @staticmethod # TODO: remove?
-    def analyze(self, data: pd.DataFrame) -> None:
-        adv_data = data.iloc[-2:].copy()
-        # self.adv_data = self.stock_data
+    def analyze(self) -> None:
+        one_year_ago = datetime.now() - timedelta(days=365)
+        adv_data = self.data[self.data['Date'] >= one_year_ago].copy()
+
         adv_data.ta.macd(append=True)
         adv_data.ta.rsi(append=True)
         adv_data.ta.bbands(append=True)
@@ -50,7 +52,6 @@ class Analyzer:
 
     # def get_description(self, start_date: datetime.date, end_date: datetime.date) -> str:
     def get_description(self):
-        adv_data = self.adv_data.copy()
         # adv_data = adv_data.loc[adv_data.index.to_series().dt.date.isin([
         #         # pd.to_datetime(datetime.now().date() - timedelta(days=1)), # TODO: uncomment
         #         start_date,
@@ -61,33 +62,37 @@ class Analyzer:
 
         # start_date = start_date.strftime('%Y-%m-%d')
         # end_date = end_date.strftime('%Y-%m-%d')
-        start_date = adv_data.index[0]
-        end_date = adv_data.index[1]
+        start_date = self.adv_data.index[0]
+        end_date = self.adv_data.index[1]
         # start_date = adv_data.reset_index().iloc[0, 1]#.strftime('%Y-%m-%d')
         # end_date = adv_data.reset_index().iloc[1, 1]#.strftime('%Y-%m-%d')
         # adv_data = adv_data.reset_index()
 
         # start_price = adv_data.loc[start_date, 'Adj Close']
         # end_price = adv_data.loc[end_date, 'Adj Close']
-        start_price = adv_data.loc[start_date, 'Close']
-        end_price = adv_data.loc[end_date, 'Close']
+        start_price = self.adv_data.loc[start_date, 'Close']
+        end_price = self.adv_data.loc[end_date, 'Close']
         price_change = (end_price - start_price) / start_price
 
-        start_volume = adv_data.loc[start_date, 'Volume']
-        end_volume = adv_data.loc[end_date, 'Volume']
+        start_volume = self.adv_data.loc[start_date, 'Volume']
+        end_volume = self.adv_data.loc[end_date, 'Volume']
         volume_change = (end_volume - start_volume) / start_volume
 
-        price_directions = {1: "выросла", -1: "упала", 0: None}
-        volume_directions = {1: "увеличился", -1: "уменьшился", 0: None}
+        price_directions = {1: "increased", -1: "decreased", 0: None}
+        volume_directions = {1: "increased", -1: "decreased", 0: None}
 
         price_change_direction = price_directions[np.sign(price_change)]
         volume_change_direction = volume_directions[np.sign(volume_change)]
 
-        description = f"Зафиксирован скачок в цене акции {self.ticker}. Дата: {adv_data.reset_index().iloc[1, 1].strftime('%Y-%m-%d')}.\n"
+
+        description = f"A price spike has been detected for {self.ticker}. Date: {self.adv_data.reset_index().iloc[1, 1].strftime('%Y-%m-%d')}.\n"
+        # TODO: add info about company
+        # description += (f"О компании:\n"
+        #                 f"Сектор ")
         if price_change_direction:
-            description += f"Цена {price_change_direction} на {abs(price_change * 100):.2f}%.\n"
+            description += f"Price {price_change_direction} by {abs(price_change * 100):.2f}%.\n"
         if volume_change_direction:
-            description += f"Объем торгов {volume_change_direction} на {abs(volume_change * 100):.2f}%.\n"
+            description += f"Volume {volume_change_direction} by {abs(volume_change * 100):.2f}%.\n"
         print(description)
 
         # description += "\nТехнические индикаторы:\n"
@@ -122,11 +127,12 @@ class Analyzer:
 
         # Price Trend Chart
         plt.figure()
-        plt.plot(self.adv_data.index, self.adv_data['Close'], label='CClose', color='blue')
+        plt.plot(self.adv_data.set_index('Date').index, self.adv_data['Close'], label='Close', color='blue')
         # plt.plot(self.adv_data.index, self.adv_data['EMA_50'], label='EMA 50', color='green')
         # plt.plot(self.adv_data.index, self.adv_data['SMA_20'], label='SMA 20', color='orange')
         plt.title(f"Price Trend of {self.ticker}")
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
+        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+        plt.gca().xaxis.set_major_locator(mdates.MonthLocator())
         plt.xticks(rotation=45, fontsize=8)
         plt.legend()
         plot_images['PT'] = self.save_plot_to_bytes()
@@ -136,7 +142,8 @@ class Analyzer:
             plt.figure()
             plt.plot(self.adv_data['OBV'], label='On-Balance Volume')
             plt.title(f"On-Balance Volume (OBV) Indicator of {self.ticker}")
-            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b%d'))
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y %b'))
+            plt.gca().xaxis.set_major_locator(mdates.YearLocator())
             plt.xticks(rotation=45, fontsize=8)
             plt.legend()
             plot_images['OBV'] = self.save_plot_to_bytes()

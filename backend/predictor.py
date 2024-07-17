@@ -1,9 +1,6 @@
-from datetime import datetime, timedelta
-import yfinance as yf
 import pandas as pd
 import prophet
-import matplotlib.pyplot as plt
-# from backend.scraper import Dataset
+from datetime import timedelta
 
 
 # class Dataset:
@@ -32,7 +29,7 @@ import matplotlib.pyplot as plt
 #     #     test_row = pd.DataFrame([[self.forecast_date, 0.0, 0.0, 0.0, 0.0]], columns=self.dataset.columns)
 #     #     self.dataset = pd.concat([self.dataset, test_row])
 
-class Features():
+class Features:
     def __init__(self, dataset):
         # self.dataset = dataset.copy()
         self.dataset = dataset.copy().drop(columns=["Dividends", "Stock Splits", "Volume"])
@@ -105,10 +102,19 @@ class Predictor(Features):
         return self.model.predict(
             self.dataset.iloc[-1:][[col for col in self.dataset if col != "Close"]].rename(columns={"Date": "ds"}))
 
-    def forecast(self):
+    def forecast(self) -> dict:
         self.create_features()
         self.build_model()
-        return self.train_and_forecast()
+        forecast = self.train_and_forecast()
+
+        actual_forecast = round(forecast.yhat[0], 2)
+        lower_bound = round(forecast.yhat_lower[0], 2)
+        upper_bound = round(forecast.yhat_upper[0], 2)
+        bound = round(((upper_bound - actual_forecast) + (actual_forecast - lower_bound) / 2), 2)
+        return {'forecast': actual_forecast,
+                'forecast_date': self.forecast_date.date(),
+                'bound': bound
+        }
 
     # def plot_predictions(self, data, forecast):
     #     plt.figure(figsize=(10, 6))
