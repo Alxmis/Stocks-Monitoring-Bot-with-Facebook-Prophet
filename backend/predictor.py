@@ -1,158 +1,139 @@
-import numpy as np
-from prophet import Prophet
-import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
 import yfinance as yf
 import pandas as pd
-from datetime import datetime, timedelta
-from functools import reduce
-from io import BytesIO
+import prophet
+import matplotlib.pyplot as plt
 
-# TODO: move to another file
-import warnings
-warnings.filterwarnings('ignore')
 
-class Predictor():
-    def __init__(self, stock_price: pd.DataFrame) -> None:
-        self.stock_price = stock_price
-        self.model = None
+class Dataset:
+    def build_dataset(self):
+        start_date = datetime(2010, 1, 1).date()
+        end_date = datetime.now().date()
 
-    def train_model(self) -> None:
-        self.stock_price.index = self.stock_price.index.tz_localize(None)
-        self.stock_price = self.stock_price.reset_index().rename(columns={'Datetime': 'ds', 'Adj Close': 'y'})
-        self.model = Prophet()
-        self.model.add_country_holidays(country_name='US')
+        try:
+            self.dataset = self.socket.history(start=start_date, end=end_date, interval="1d").reset_index()
+            self.dataset.drop(columns=["Dividends", "Stock Splits", "Volume"], inplace=True)
+            self.add_forecast_date()
+        except Exception as e:
+            print("Exception raised at: 'predictor.Dataset.build()", e)
+            return False
+        else:
+            return True
 
-        self.model.fit(self.stock_price)
+    def add_forecast_date(self):
+        present_date = self.dataset.Date.max()
+        day_number = pd.to_datetime(present_date).isoweekday()
+        if day_number in [5, 6]:
+            self.forecast_date = present_date + timedelta(days=(7 - day_number) + 1)
+        else:
+            self.forecast_date = present_date  + timedelta(days=1)
+        print("Valid forcast date: ", self.forecast_date)
+        test_row = pd.DataFrame([[self.forecast_date, 0.0, 0.0, 0.0, 0.0]], columns=self.dataset.columns)
+        self.dataset = pd.concat([self.dataset, test_row])
 
-    def make_forecast(self, periods=7) -> pd.DataFrame: # TODO: periods
-        future = self.model.make_future_dataframe(periods=periods)
-        future_boolean = future['ds'].map(lambda x: True if x.weekday() in range(0, 5) else False)
-        future = future[future_boolean]
+class Features(Dataset):
+    def create_features(self):
+        status = self.build_dataset()
+        if status:
+            self.create_lag_features()
+            self.impute_missing_values()
+            self.dataset.drop(columns=["Open", "High", "Low"], inplace=True)
+            print(self.dataset.tail(3))
+            return True
+        else:
+            raise Exception("Dataset creation failed.")
 
-        stock_price_forecast = self.model.predict(future)
+    def create_lag_features(self, periods=12):
+        for i in range(1, periods + 1):
+            self.dataset[f"Close_lag_{i}"] = self.dataset.Close.shift(periods=i, axis=0)
+            self.dataset[f"Open_lag_{i}"] = self.dataset.Open.shift(periods=i, axis=0)
+            self.dataset[f"High_lag_{i}"] = self.dataset.High.shift(periods=i, axis=0)
+            self.dataset[f"Low_lag_{i}"] = self.dataset.Low.shift(periods=i, axis=0)
+        return True
 
-        return stock_price_forecast
+    def impute_missing_values(self):
+        self.dataset.fillna(0, inplace=True)
+        self.info["min_date"] = self.dataset.Date.min().date()
+        self.info["max_date"] = self.dataset.Date.max().date() - timedelta(days=1)
+        return True
 
-    @staticmethod
-    def save_plot_to_bytes() -> bytes:
-        buf = BytesIO()
-        plt.savefig(buf, format='png', dpi=300)
-        buf.seek(0)
-        return buf.getvalue()
+class Predictor(Features):
+    def __init__(self, ticker):
+        self.ticker = ticker
+        self.socket = yf.Ticker(self.ticker)
+        self.info = {
+            "sector": self.socket.info["sector"],
+            "summary": self.socket.info["longBusinessSummary"],
+            "country": self.socket.info["country"],
+            "website": self.socket.info["website"],
+            "employees": self.socket.info["fullTimeEmployees"],
+        }
 
-    def make_forecast_plot(self, stock_price_forecast):
-        plot_images = {}
+    def build_model(self):
+        additional_features = [col for col in self.dataset.columns if "lag" in col]
+        try:
+            self.model = prophet.Prophet(yearly_seasonality=True, weekly_seasonality=True, seasonality_mode="additive")
+            for name in additional_features:
+                self.model.add_regressor(name)
+        except Exception as e:
+            print("Exception raised at: 'predictor.Prophet.build()", e)
+            return False
+        else:
+            return True
 
-        forecast_plot = self.model.plot(stock_price_forecast)
-        ax = forecast_plot.gca()
+    def train_and_forecast(self):
+        self.dataset['Date'] = self.dataset['Date'].dt.tz_localize(None)
+        self.model.fit(df=self.dataset.iloc[:-1, :].rename(columns={"Date": "ds", "Close": "y"}))
+        return self.model.predict(
+            self.dataset.iloc[-1:][[col for col in self.dataset if col != "Close"]].rename(columns={"Date": "ds"}))
 
-        # Adjusting plot scale # TODO: do
-        # predicted_lines_len = len(stock_price_forecast) - len(self.stock_price)
-        # stock_price_forecast = stock_price_forecast.iloc[-predicted_lines_len:, :]
-        # start_x = stock_price_forecast.iloc[0, 0]
-        # end_x = stock_price_forecast.iloc[-1, 0]
-        # ax.set_xlim(pd.to_datetime([start_x, end_x]))
-        # ax.set_ylim([280, 290]) # TODO: adjust y scale
+    def forecast(self):
+        self.create_features()
+        self.build_model()
+        return self.train_and_forecast()
 
-        plot_images['forecast_plot'] = self.save_plot_to_bytes()
-        forecast_components_plot = self.model.plot_components(stock_price_forecast)
-        plot_images['forecast_components_plot'] = self.save_plot_to_bytes()
-
-        plt.close()
-        return plot_images
-
-    # def test_plot(self, stock_price_forecast):
-    #     df = pd.merge(self.stock_price, stock_price_forecast, on='ds', how='right')
-    #     df.set_index('ds').plot(figsize=(8, 4), color=['royalblue', "#34495e", "#e74c3c", "#e74c3c"], grid=True)
+    # def plot_predictions(self, data, forecast):
+    #     plt.figure(figsize=(10, 6))
+    #     plt.plot(data['Date'], data['Close'], label='Actual Close Prices')
+    #     plt.plot(forecast['ds'], forecast['yhat'], label='Forecasted Close Prices')
+    #     plt.fill_between(forecast['ds'], forecast['yhat_lower'], forecast['yhat_upper'], color='gray', alpha=0.2,
+    #                      label='Confidence Interval')
+    #     plt.xlabel('Date')
+    #     plt.ylabel('Close Price')
+    #     plt.title(f'Actual and Forecasted Close Prices for {self.ticker}')
+    #     plt.legend()
     #     plt.show()
 
-    # def backtesting(self):
-    #     self.stock_price['dayname'] = self.stock_price['ds'].dt.day_name()
-    #     self.stock_price['month'] = self.stock_price['ds'].dt.month
-    #     self.stock_price['year'] = self.stock_price['ds'].dt.year
-    #     self.stock_price['month/year'] = self.stock_price['month'].map(str) + '/' + self.stock_price['year'].map(str)
-    #
-    #     self.stock_price = pd.merge(self.stock_price,
-    #                                 self.stock_price['month/year'].drop_duplicates().reset_index(drop=True).reset_index(),
-    #                                 on='month/year',
-    #                                 how='left')
-    #     self.stock_price = self.stock_price.rename(columns={'index': 'month/year_index'})
-    #     # print(self.stock_price.tail())
-    #
-    #     loop_list = self.stock_price['month/year'].unique().tolist()
-    #     max_num = len(loop_list) - 1
-    #     forecast_frames = []
-    #
-    #     for num, item in enumerate(loop_list):
-    #         if num == max_num:
-    #             pass
-    #         else:
-    #             df = self.stock_price.set_index('ds')[
-    #                 self.stock_price[self.stock_price['month/year'] == loop_list[0]]['ds'].min():\
-    #                 self.stock_price[self.stock_price['month/year'] == item]['ds'].max()]
-    #
-    #             df = df.reset_index()[['ds', 'y']]
-    #             model = Prophet()
-    #             model.fit(df)
-    #
-    #             future = self.stock_price[self.stock_price['month/year_index'] == (num + 1)][['ds']]
-    #             forecast = model.predict(future)
-    #             forecast_frames.append(forecast)
-    #
-    #     stock_price_forecast = reduce(lambda top, bottom: pd.concat([top, bottom], sort=False), forecast_frames)
-    #     stock_price_forecast = stock_price_forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
-    #
-    #     df = pd.merge(self.stock_price[['ds', 'y', 'month/year_index']], stock_price_forecast, on='ds')
-    #     df['Percent Change'] = df['y'].pct_change()
-    #     df.set_index('ds')[['y', 'yhat', 'yhat_lower', 'yhat_upper']].plot(figsize=(16, 8), color=['royalblue', "#34495e", "#e74c3c", "#e74c3c"], grid=True)
-    #
-    #     # ----------------------------------------------------------------
-    #     # TRADING ALGOS
-    #     df['Hold'] = (df['Percent Change'] + 1).cumprod()
-    #     df['Prophet'] = ((df['yhat'].shift(-1) > df['yhat']).shift(1) * (df['Percent Change']) + 1).cumprod()
-    #     df['Prophet Thresh'] = ((df['y'] > df['yhat_lower']).shift(1) * (df['Percent Change']) + 1).cumprod()
-    #     df['Seasonality'] = ((~df['ds'].dt.month.isin([8, 9])).shift(1) * (df['Percent Change']) + 1).cumprod()
-    #
-    #     (df.dropna().set_index('ds')[['Hold', 'Prophet', 'Prophet Thresh', 'Seasonality']] * 1000).plot(figsize=(16, 8),
-    #                                                                                                     grid=True)
-    #
-    #     print(f"Hold = {df['Hold'].iloc[-1] * 1000:,.0f}")
-    #     print(f"Prophet = {df['Prophet'].iloc[-1] * 1000:,.0f}")
-    #     print(f"Prophet Thresh = {df['Prophet Thresh'].iloc[-1] * 1000:,.0f}")
-    #     print(f"Seasonality = {df['Seasonality'].iloc[-1] * 1000:,.0f}")
-    #
-    #
-    #     performance = {}
-    #
-    #     for x in np.linspace(.9, .99, 10):
-    #         y = ((df['y'] > df['yhat_lower'] * x).shift(1) * (df['Percent Change']) + 1).cumprod()
-    #         performance[x] = y
-    #
-    #     best_yhat = pd.DataFrame(performance).max().idxmax()
-    #     pd.DataFrame(performance).plot(figsize=(16, 8), grid=True);
-    #     print(f'Best Yhat = {best_yhat:,.2f}')
-    #
-    #     df['Optimized Prophet Thresh'] = ((df['y'] > df['yhat_lower'] * best_yhat).shift(1) *
-    #                                       (df['Percent Change']) + 1).cumprod()
-    #     (df.dropna().set_index('ds')[['Hold', 'Prophet', 'Prophet Thresh',
-    #                                   'Seasonality', 'Optimized Prophet Thresh']] * 1000).plot(figsize=(16, 8),
-    #                                                                                            grid=True)
-    #
-    #     print(f"\nHold = {df['Hold'].iloc[-1] * 1000:,.0f}")
-    #     print(f"Prophet = {df['Prophet'].iloc[-1] * 1000:,.0f}")
-    #     print(f"Prophet Thresh = {df['Prophet Thresh'].iloc[-1] * 1000:,.0f}")
-    #     print(f"Seasonality = {df['Seasonality'].iloc[-1] * 1000:,.0f}")
-    #     print(f"Optimized Prophet Thresh = {df['Optimized Prophet Thresh'].iloc[-1] * 1000:,.0f}")
-    #     # plt.show()
 
+# Example usage
+# predictor = StockPredictor('AAPL')
+# data, predictions = predictor.train_n_predict()
+# predictor.plot_predictions(data, predictions)
 
+ticker = 'MSFT'
+master_prophet = Predictor(ticker)
+forecast = master_prophet.forecast()
 
-# stock_data = yf.download('AAPL', start='2018-01-01', end='2023-01-01')
-# print(stock_data)
-# stock_price = stock_data[['Adj Close']]
-# predictor = Predictor(stock_price)
-# predictor.train_model()
-# stock_price_forecast = predictor.make_forecast(periods=5)
-# predictor.make_forecast_plot(stock_price_forecast)
+actual_forecast = round(forecast.yhat[0], 2)
+lower_bound = round(forecast.yhat_lower[0], 2)
+upper_bound = round(forecast.yhat_upper[0], 2)
+bound = round(((upper_bound - actual_forecast) + (actual_forecast - lower_bound) / 2), 2)
 
-# predictor.backtesting(stock_price_forecast)
+summary = master_prophet.info["summary"]
+country = master_prophet.info["country"]
+sector = master_prophet.info["sector"]
+website = master_prophet.info["website"]
+min_date = master_prophet.info["min_date"]
+max_date = master_prophet.info["max_date"]
+
+forecast_date = master_prophet.forecast_date.date()
+print(f"Ticker: {ticker.upper()}")
+print(f"Sector: {sector}")
+print(f"Country: {country}")
+print(f"Website: {website}")
+print(f"Summary: {summary}")
+print(f"Min Date: {min_date}")
+print(f"Max Date: {max_date}")
+print(f"Forecast Date: {forecast_date}")
+print(f"Forecast: {actual_forecast}")
+print(f"Bound: {bound}")
