@@ -14,7 +14,7 @@ from telegram.ext import (
     CallbackContext,
 )
 from backend.scraper import Dataset
-from backend.tech_analyzer import Analyzer
+from backend.analyzer import Analyzer
 from backend.user_database import DB
 from backend.predictor import Predictor
 
@@ -22,6 +22,7 @@ from backend.predictor import Predictor
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                      level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger('prophet').setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
 TICKER_LIST = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')[0]
@@ -85,17 +86,17 @@ async def check_spikes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
             predictor = Predictor(dataset=data)
             forecast = predictor.forecast()
-            forecast_description = (f'\nForecast date: {forecast["forecast_date"]}\n'
-                                    f'Forecast (Closing Price): {forecast["forecast"]}\n'
-                                    f'Uncertainty: {forecast["bound"]}\n'
+            forecast_description = (f'\n📅 Forecast date: {forecast["forecast_date"]}\n'
+                                    f'📈 Forecast (Closing Price): {forecast["forecast"]}\n'
+                                    f'❓ Uncertainty: {forecast["bound"]}\n'
                                     )
             description += forecast_description
 
-            description += (f"\nAbout the company:\n"
-                            f"Sector: {dataset.info['sector']}\n"
-                            f"Country: {dataset.info['country']}\n"
-                            f"Currency: {dataset.info['currency']}"
-                            f"Website: {dataset.info['website']}\n"
+            description += (f"\n🏢 About the company:\n"
+                            f"🏭 Sector: {dataset.info['sector']}\n"
+                            f"🌍 Country: {dataset.info['country']}\n"
+                            f"💵 Currency: {dataset.info['currency']}\n"
+                            f"🌐 Website: {dataset.info['website']}\n"
                             )
             print(dataset.info)
             print(forecast_description)

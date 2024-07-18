@@ -1,6 +1,8 @@
-requests~=2.31.0
 pandas~=2.2.2
 halo~=0.0.31
-python-telegram-bot~=21.1.1
 yfinance~=0.2.38
 matplotlib~=3.8.4
+prophet~=1.1.5
+numpy~=1.26.4
+pytz~=2024.1
+python-dotenv~=1.0.1

@@ -39,9 +39,9 @@ def main() -> None:
     application.add_handler(conv_handler)
 
     job_queue = application.job_queue
-    job_queue.run_daily(lambda context: handler.check_spikes(None, context=context, mode='auto'),
-                        time=datetime.time(hour=23, minute=59).replace(tzinfo=LOCAL_TIMEZONE),
-                        days=(0, 1, 2, 3, 4) # run only in weekdays
+    job_queue.run_daily(lambda context: handler.check_spikes(None, context=context),
+                        time=datetime.time(hour=13, minute=24).replace(tzinfo=LOCAL_TIMEZONE),
+                        days=(1, 2, 3, 4, 5) # run only in weekdays
     )
 
     application.run_polling()

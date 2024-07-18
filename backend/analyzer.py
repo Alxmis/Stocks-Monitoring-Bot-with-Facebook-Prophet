@@ -1,13 +1,9 @@
 import matplotlib.pyplot as plt, matplotlib.dates as mdates
 import pandas as pd
 import numpy as np
-import yfinance as yf
 import pandas_ta as ta
 from datetime import datetime, timedelta
-# from backend.scraper import Scraper
 from io import BytesIO
-from backend.predictor import Predictor
-from backend.scraper import Dataset
 
 class Analyzer:
     def __init__(self, ticker: str, data: pd.DataFrame) -> None:
@@ -56,13 +52,13 @@ class Analyzer:
         price_change_direction = price_directions[np.sign(price_change)]
         volume_change_direction = volume_directions[np.sign(volume_change)]
 
-        description = (f"📈 A price spike has been detected for {self.ticker}. Date: {self.adv_data.reset_index().iloc[1, 1].strftime('%Y-%m-%d')}.\n"
+        description = (f"📈 A price spike has been detected for {self.ticker}. Date: {self.adv_data.reset_index().iloc[1, 1].strftime('%Y-%m-%d')}.\n\n"
                        f"💰 Closing price: {end_price}\n")
 
         if price_change_direction:
-            description += f"Price {price_change_direction} by {abs(price_change * 100):.2f}%.\n"
+            description += f"📊 Price {price_change_direction} by {abs(price_change * 100):.2f}%.\n"
         if volume_change_direction:
-            description += f"Volume {volume_change_direction} by {abs(volume_change * 100):.2f}%.\n"
+            description += f"📉 Volume {volume_change_direction} by {abs(volume_change * 100):.2f}%.\n"
 
         return description
 
