@@ -28,9 +28,6 @@ def main() -> None:
         entry_points=[CommandHandler("start", handler.start)],
         states={
             CHOOSING: [
-                MessageHandler(
-                    filters.Regex(r"^Check spikes$"), handler.check_spikes
-                ),
                 MessageHandler(filters.Regex(r"^Help$"), handler.help),
             ],
         },
@@ -43,7 +40,8 @@ def main() -> None:
 
     job_queue = application.job_queue
     job_queue.run_daily(lambda context: handler.check_spikes(None, context=context, mode='auto'),
-                        time=datetime.time(hour=0, minute=0).replace(tzinfo=LOCAL_TIMEZONE)
+                        time=datetime.time(hour=23, minute=59).replace(tzinfo=LOCAL_TIMEZONE),
+                        days=(0, 1, 2, 3, 4) # run only in weekdays
     )
 
     application.run_polling()
