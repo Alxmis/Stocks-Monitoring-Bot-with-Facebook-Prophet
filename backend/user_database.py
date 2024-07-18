@@ -32,4 +32,9 @@ class DB:
         conn.close()
         return [user[0] for user in users]
 
-
+    def remove_user(self, chat_id) -> None:
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM users WHERE chat_id = ?', (chat_id,))
+        conn.commit()
+        conn.close()

@@ -35,15 +35,15 @@ class Analyzer:
         self.adv_data = adv_data
 
     def get_description(self):
-        start_date = self.adv_data.index[0]
-        end_date = self.adv_data.index[1]
+        start_date_index = self.adv_data.index[-2]
+        end_date_index = self.adv_data.index[-1]
 
-        start_price = self.adv_data.loc[start_date, 'Close']
-        end_price = self.adv_data.loc[end_date, 'Close']
+        start_price = self.adv_data.loc[start_date_index, 'Close']
+        end_price = self.adv_data.loc[end_date_index, 'Close']
         price_change = (end_price - start_price) / start_price
 
-        start_volume = self.adv_data.loc[start_date, 'Volume']
-        end_volume = self.adv_data.loc[end_date, 'Volume']
+        start_volume = self.adv_data.loc[start_date_index, 'Volume']
+        end_volume = self.adv_data.loc[end_date_index, 'Volume']
         volume_change = (end_volume - start_volume) / start_volume
 
         price_directions = {1: "increased", -1: "decreased", 0: None}
@@ -52,7 +52,7 @@ class Analyzer:
         price_change_direction = price_directions[np.sign(price_change)]
         volume_change_direction = volume_directions[np.sign(volume_change)]
 
-        description = (f"📈 A price spike has been detected for {self.ticker}. Date: {self.adv_data.reset_index().iloc[1, 1].strftime('%Y-%m-%d')}.\n\n"
+        description = (f"📈 A price spike has been detected for {self.ticker}. Date: {self.adv_data.reset_index().iloc[-1, 1].strftime('%Y-%m-%d')}.\n\n"
                        f"💰 Closing price: {end_price}\n")
 
         if price_change_direction:

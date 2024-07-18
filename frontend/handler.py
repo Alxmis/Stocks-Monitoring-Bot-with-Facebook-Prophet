@@ -13,6 +13,7 @@ from telegram.ext import (
     ConversationHandler,
     CallbackContext,
 )
+from telegram.error import TelegramError
 from backend.scraper import Dataset
 from backend.analyzer import Analyzer
 from backend.user_database import DB
@@ -88,7 +89,7 @@ async def check_spikes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             forecast = predictor.forecast()
             forecast_description = (f'\n📅 Forecast date: {forecast["forecast_date"]}\n'
                                     f'📈 Forecast (Closing Price): {forecast["forecast"]}\n'
-                                    f'❓ Uncertainty: {forecast["bound"]}\n'
+                                    f'❓ Uncertainty: {forecast["bound"]}%\n'
                                     )
             description += forecast_description
 
@@ -98,18 +99,24 @@ async def check_spikes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                             f"💵 Currency: {dataset.info['currency']}\n"
                             f"🌐 Website: {dataset.info['website']}\n"
                             )
-            print(dataset.info)
-            print(forecast_description)
 
         users = db.get_users()
         for user in users:
-            await context.bot.send_message(chat_id=user,
-                                           text=description
-            )
-            await context.bot.send_photo(chat_id=user,
-                                         photo=InputFile(plot_images['PT'])
-            )
-        update_notification_log(notification_log)
+            try:
+                await context.bot.send_message(chat_id=user,
+                                               text=description
+                )
+                await context.bot.send_photo(chat_id=user,
+                                             photo=InputFile(plot_images['PT'])
+                )
+            except TelegramError as e:
+                if "blocked" in str(e).lower():
+                    print(f"User {user} has blocked the bot. Removing from database.")
+                    db.remove_user(user)
+                else:
+                    print(f"Failed to send message to {user}: {e}")
+
+    update_notification_log(notification_log)
 
     return CHOOSING
 
