@@ -1,4 +1,6 @@
 # Stock Monitoring and Notification Bot
+[![File count](https://img.shields.io/github/directory-file-count/alxmis/Stocks-Monitoring-Bot-with-Facebook-Prophet?style=for-the-badge&logo=github)](https://img.shields.io/github/directory-file-count/alxmis/Stocks-Monitoring-Bot-with-Facebook-Prophet?style=for-the-badge&logo=github) [![Repo size](https://img.shields.io/github/repo-size/alxmis/Stocks-Monitoring-Bot-with-Facebook-Prophet?style=for-the-badge&logo=github)](https://img.shields.io/github/repo-size/alxmis/Stocks-Monitoring-Bot-with-Facebook-Prophet?style=for-the-badge&logo=github) [![Language count](https://img.shields.io/github/languages/count/alxmis/Stocks-Monitoring-Bot-with-Facebook-Prophet?style=for-the-badge&logo=github)](https://img.shields.io/github/languages/count/alxmis/Stocks-Monitoring-Bot-with-Facebook-Prophet?style=for-the-badge&logo=github) [![Top language used](https://img.shields.io/github/languages/top/alxmis/Stocks-Monitoring-Bot-with-Facebook-Prophet?style=for-the-badge&logo=python&logoColor=white)](https://img.shields.io/github/languages/top/alxmis/Stocks-Monitoring-Bot-with-Facebook-Prophet?style=for-the-badge&logo=python&logoColor=white)
+
 
 ## Overview
 
